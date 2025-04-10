@@ -6,7 +6,7 @@
 
 1. Клонирование репозитория:
    
-```git clone https://github.com/sofyaming/project.git
+```git clone https://github.com/sofyaming/project.git```
 
 2. Переход в директорию проекта:
 
