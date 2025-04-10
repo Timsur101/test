@@ -63,10 +63,77 @@ class DB:
 # создаём экземпляр базы данных на основе класса
 db = DB()
 
+# заполняем поля ввода значениями выделенной позиции в общем списке
+def get_selected_row(event): 
+    # будем обращаться к глобальной переменной
+    global selected_tuple
+    # получаем позицию выделенной записи в списке
+    index = list1.curselection()[0] #this is the id of the selected tuple
+    # получаем значение выделенной записи
+    selected_tuple = list1.get(index) 
+    # удаляем то, что было раньше в поле ввода
+    e1.delete(0, END)                
+    # и добавляем туда текущее значение названия покупки
+    e1.insert(END, selected_tuple[1]) 
+    # делаем то же самое с другими полями
+    e2.delete(0, END)
+    e2.insert(END, selected_tuple[2]) 
+    e3.delete(0, END)
+    e3.insert(END, selected_tuple[3]) 
+
+# обработчик нажатия на кнопку «Посмотреть всё»
+def view_command():         
+    # очищаем список в приложении
+    list1.delete(0, END)    
+    # проходим все записи в БД
+    for row in db.view():   
+        # и сразу добавляем их на экран
+        list1.insert(END, row)  
+
+# обработчик нажатия на кнопку «Поиск»
+def search_command():       
+    # очищаем список в приложении
+    list1.delete(0, END)   
+    # находим все записи по названию покупки
+    for row in db.search(product_text.get()):
+        # и добавляем их в список в приложение
+        list1.insert(END, row) 
+
+# обработчик нажатия на кнопку «Добавить»
+def add_command():         
+    # добавляем запись в БД
+    db.insert(product_text.get(), price_text.get(), comment_text.get()) 
+    # обновляем общий список в приложении
+    view_command()
+
+# обработчик нажатия на кнопку «Удалить»
+def delete_command(): 
+    # удаляем запись из базы данных по индексу выделенного элемента
+    db.delete(selected_tuple[0]) 
+    # обновляем общий список расходов в приложении
+    view_command()
+
+# обработчик нажатия на кнопку «Обновить»
+def update_command():
+    # обновляем данные в БД о выделенной записи
+    db.update(selected_tuple[0], product_text.get(), price_text.get()) 
+    # обновляем общий список расходов в приложении
+    view_command()
+
 # подключаем графическую библиотеку
 window = Tk()
 # заголовок окна
 window.title("Бюджет 0.1")
+
+# обрабатываем закрытие окна
+def on_closing(): 
+    # показываем диалоговое окно с кнопкой
+    if messagebox.askokcancel("", "Закрыть программу?"): 
+        # удаляем окно и освобождаем память
+        window.destroy()
+        
+# сообщаем системе о том, что делать, когда окно закрывается
+window.protocol("WM_DELETE_WINDOW", on_closing)  
 
 # создаём надписи для полей ввода и размещаем их по сетке
 l1 = Label(window, text="Название")
@@ -96,7 +163,7 @@ e3.grid(row=1, column=1)
 list1 = Listbox(window, height=25, width=65)
 list1.grid(row=2, column=0, rowspan=6, columnspan=2)
 
-# на всякий случай добавим сбоку скролл, чтобы можно было быстро прокручивать длинные списки
+# добавим сбоку скролл, чтобы можно было быстро прокручивать длинные списки
 sb1 = Scrollbar(window)
 sb1.grid(row=2, column=2, rowspan=6)
 
@@ -106,23 +173,26 @@ sb1.configure(command=list1.yview)
 
 # создаём кнопки действий и привязываем их к своим функциям
 # кнопки размещаем тоже по сетке
-b1 = Button(window, text="Посмотреть все", width=12, command=print('view_command'))
+b1 = Button(window, text="Посмотреть все", width=12, command=view_command)
 b1.grid(row=2, column=3) #size of the button
 
-b2 = Button(window, text="Поиск", width=12, command=print('search_command'))
+b2 = Button(window, text="Поиск", width=12, command=search_command)
 b2.grid(row=3, column=3)
 
-b3 = Button(window, text="Добавить", width=12, command=print('add_command'))
+b3 = Button(window, text="Добавить", width=12, command=add_command)
 b3.grid(row=4, column=3)
 
-b4 = Button(window, text="Обновить", width=12, command=print('update_command'))
+b4 = Button(window, text="Обновить", width=12, command=update_command)
 b4.grid(row=5, column=3)
 
-b5 = Button(window, text="Удалить", width=12, command=print('delete_command'))
+b5 = Button(window, text="Удалить", width=12, command=delete_command)
 b5.grid(row=6, column=3)
 
-b6 = Button(window, text="Закрыть", width=12, command=print('on_closing'))
+b6 = Button(window, text="Закрыть", width=12, command=on_closing)
 b6.grid(row=7, column=3)
+
+# обновляем общий список расходов
+view_command()
 
 # пусть окно работает всё время до закрытия
 window.mainloop()
