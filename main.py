@@ -2,6 +2,7 @@
 import sqlite3
 # подключаем графическую библиотеку для создания интерфейсов
 from tkinter import *
+from tkinter import messagebox
 # создаём класс для работы с базой данных
 class DB:                        
     # конструктор класса
