@@ -172,6 +172,9 @@ sb1.grid(row=2, column=2, rowspan=6)
 list1.configure(yscrollcommand=sb1.set)
 sb1.configure(command=list1.yview)
 
+# привязываем выбор любого элемента списка к запуску функции выбора
+list1.bind('<<ListboxSelect>>', get_selected_row)
+
 # создаём кнопки действий и привязываем их к своим функциям
 # кнопки размещаем тоже по сетке
 b1 = Button(window, text="Посмотреть все", width=12, command=view_command)
