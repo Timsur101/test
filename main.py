@@ -149,25 +149,25 @@ def main(page: ft.Page):
             ft.ElevatedButton(
                 "Посмотреть все",
                 style=button_style,
-                #icon=ft.icons.VIEW_LIST,
+                icon=ft.Icons.VIEW_LIST,
                 on_click=lambda e: view_command(e)
             ),
             ft.ElevatedButton(
                 "Поиск",
                 style=button_style,
-                #icon=ft.icons.SEARCH,
+                icon=ft.Icons.SEARCH,
                 on_click=lambda e: search_command(e)
             ),
             ft.ElevatedButton(
                 "Добавить",
                 style=button_style,
-                #icon=ft.icons.ADD,
+                icon=ft.Icons.ADD,
                 on_click=lambda e: add_command(e)
             ),
             ft.ElevatedButton(
                 "Обновить",
                 style=button_style,
-                #icon=ft.icons.UPDATE,
+                icon=ft.Icons.UPDATE,
                 on_click=lambda e: update_command(e)
             ),
             ft.ElevatedButton(
@@ -179,7 +179,7 @@ def main(page: ft.Page):
                     padding=ft.padding.symmetric(horizontal=20, vertical=12),
                     shape=ft.RoundedRectangleBorder(radius=8)
                 ),
-                #icon=ft.icons.DELETE,
+                icon=ft.Icons.DELETE,
                 on_click=lambda e: delete_command(e)
             ),
         ],
@@ -195,7 +195,7 @@ def main(page: ft.Page):
                 ft.Card(
                     content=ft.Container(
                         content=ft.ListTile(
-                            #leading=ft.Icon(ft.icons.SHOPPING_BAG, color=secondary_color),
+                            leading=ft.Icon(ft.Icons.SHOPPING_BAG, color=secondary_color),
                             title=ft.Text(
                                 f"{row[1]}",
                                 color=text_color,
