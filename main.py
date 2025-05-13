@@ -98,16 +98,18 @@ class DB:
         finally:
             conn.close()
 
-    def search(self, product=""):
+    def search(self, product="", category=""):
         conn = self._get_connection()
         try:
             cur = conn.cursor()
-            cur.execute(
-                "SELECT buy.id, buy.product, buy.price, buy.comment, "
-                "categories.name as category "
-                "FROM buy LEFT JOIN categories ON buy.category_id = categories.id "
-                "WHERE buy.product LIKE ?", (f"%{product}%",)
-            )
+            query = """
+                        SELECT buy.id, buy.product, buy.price, buy.comment, 
+                               categories.name as category 
+                        FROM buy LEFT JOIN categories ON buy.category_id = categories.id
+                        WHERE buy.product LIKE ? 
+                        AND (categories.name LIKE ? OR ? = '')
+                    """
+            cur.execute(query, (f"%{product}%", f"%{category}%", category))
             return cur.fetchall()
         finally:
             conn.close()
@@ -175,6 +177,16 @@ def main(page: ft.Page):
 
         label_style=ft.TextStyle(color=text_color),
         expand=True)
+
+    category_search = ft.TextField(
+        label="Категория (для поиска)",
+        border_color=secondary_color,
+        filled=True,
+        bgcolor=card_color,
+        color=text_color,
+        width=200,
+        label_style=ft.TextStyle(color=text_color)
+    )
 
     list_view = ft.ListView(expand=True, spacing=5)
     list_container = ft.Container(
@@ -266,7 +278,7 @@ def main(page: ft.Page):
 
     def search_command(e):
         list_view.controls.clear()
-        for row in db.search(product_text.value):
+        for row in db.search(product=product_text.value, category=category_search.value):
             list_view.controls.append(
                 ft.Card(
                     content=ft.ListTile(
@@ -328,7 +340,7 @@ def main(page: ft.Page):
                 weight=ft.FontWeight.BOLD),
             ft.Divider(height=20, color=secondary_color),
             ft.Row(
-                controls=[product_text, price_text],
+                controls=[product_text, price_text, category_search],
                 spacing=20),
             ft.Row(
                 controls=[comment_text, category_dropdown],
