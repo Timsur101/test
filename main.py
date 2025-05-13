@@ -79,12 +79,12 @@ class DB:
         finally:
             conn.close()
 
-    def update(self, id, product, price, category_id):
+    def update(self, id, product, price, comment, category_id):
         conn = self._get_connection()
         try:
             conn.execute(
-                "UPDATE buy SET product=?, price=?, category_id=? WHERE id=?",
-                (product, price, category_id, id)
+                "UPDATE buy SET product=?, price=?, comment=?, category_id=? WHERE id=?",
+                (product, price, comment, category_id, id)
             )
             conn.commit()
         finally:
@@ -295,9 +295,20 @@ def main(page: ft.Page):
             clear_fields()
 
     def update_command(e):
+        if not selected_tuple:
+            page.snack_bar = ft.SnackBar(ft.Text("Выберите запись для обновления!"))
+            page.snack_bar.open = True
+            page.update()
+            return
+
+        if not product_text.value or not price_text.value:
+            page.snack_bar = ft.SnackBar(ft.Text("Название и стоимость обязательны!"))
+            page.snack_bar.open = True
+            page.update()
+            return
         if selected_tuple:
             category_id = next((cat[0] for cat in categories if cat[1] == category_dropdown.value), None)
-            db.update(selected_tuple[0], product_text.value, price_text.value, category_id)
+            db.update(selected_tuple[0], product_text.value, price_text.value, comment_text.value, category_id)
 
             update_list()
 
