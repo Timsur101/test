@@ -103,12 +103,12 @@ class DB:
         try:
             cur = conn.cursor()
             query = """
-                        SELECT buy.id, buy.product, buy.price, buy.comment, 
-                               categories.name as category 
-                        FROM buy LEFT JOIN categories ON buy.category_id = categories.id
-                        WHERE buy.product LIKE ? 
-                        AND (categories.name LIKE ? OR ? = '')
-                    """
+                SELECT buy.id, buy.product, buy.price, buy.comment, 
+                       categories.name as category 
+                FROM buy LEFT JOIN categories ON buy.category_id = categories.id
+                WHERE buy.product LIKE ? 
+                AND (categories.name LIKE ? OR ? = '')
+            """
             cur.execute(query, (f"%{product}%", f"%{category}%", category))
             return cur.fetchall()
         finally:
@@ -167,25 +167,18 @@ def main(page: ft.Page):
 
     # Выпадающий список категорий
     category_dropdown = ft.Dropdown(
+        hint_text="Выберите категорию для фильтрации",
         label="Категория",
-        options=[ft.dropdown.Option(cat[1]) for cat in categories],
+        options=[ft.dropdown.Option("Все категории")] + [ft.dropdown.Option(cat[1]) for cat in categories],
         border_color=secondary_color,
         filled=False,
         fill_color=card_color,
         bgcolor="#FFFDF6",
         color=text_color,
-
         label_style=ft.TextStyle(color=text_color),
-        expand=True)
+        expand=True,
+        on_change=lambda e: search_command(e)  # Автопоиск при изменении
 
-    category_search = ft.TextField(
-        label="Категория (для поиска)",
-        border_color=secondary_color,
-        filled=True,
-        bgcolor=card_color,
-        color=text_color,
-        width=200,
-        label_style=ft.TextStyle(color=text_color)
     )
 
     list_view = ft.ListView(expand=True, spacing=5)
@@ -241,7 +234,14 @@ def main(page: ft.Page):
 
     def update_list():
         list_view.controls.clear()
-        for row in db.view():
+        selected_category = category_dropdown.value if category_dropdown.value and category_dropdown.value != "Все категории" else ""
+
+        rows = db.search(
+            product=product_text.value if product_text.value else "",
+            category=selected_category
+        )
+
+        for row in rows:
             list_view.controls.append(
                 ft.Card(
                     content=ft.Container(
@@ -255,7 +255,7 @@ def main(page: ft.Page):
                             subtitle=ft.Text(
                                 f"{row[2]} руб. • {row[4]} • {row[3]}",
                                 size=14),
-                            on_click=lambda e, row=row: select_row(row), ),
+                            on_click=lambda e, row=row: select_row(row)),
                         padding=10,
                         bgcolor=card_color,
                         border_radius=8),
@@ -274,20 +274,12 @@ def main(page: ft.Page):
         page.update()
 
     def view_command(e):
+        category_dropdown.value = "Все категории"
+        product_text.value = ""
         update_list()
 
     def search_command(e):
-        list_view.controls.clear()
-        for row in db.search(product=product_text.value, category=category_search.value):
-            list_view.controls.append(
-                ft.Card(
-                    content=ft.ListTile(
-                        title=ft.Text(f"{row[1]} - {row[2]} руб."),
-                        subtitle=ft.Text(f"{row[4]} • {row[3]}"),
-                        on_click=lambda e, row=row: select_row(row)),
-                    elevation=1,
-                    color=secondary_color))
-        page.update()
+        update_list()
 
     def add_command(e):
         if product_text.value and price_text.value:
@@ -340,7 +332,7 @@ def main(page: ft.Page):
                 weight=ft.FontWeight.BOLD),
             ft.Divider(height=20, color=secondary_color),
             ft.Row(
-                controls=[product_text, price_text, category_search],
+                controls=[product_text, price_text],
                 spacing=20),
             ft.Row(
                 controls=[comment_text, category_dropdown],
@@ -354,7 +346,7 @@ def main(page: ft.Page):
                 expand=True,
                 vertical_alignment=ft.CrossAxisAlignment.START)],
             expand=True))
-
+    category_dropdown.value = "Все категории"
     update_list()
 
 
