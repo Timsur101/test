@@ -24,6 +24,7 @@ class DB:
                 "price TEXT, "
                 "comment TEXT, "
                 "category_id INTEGER, "
+                "date TEXT, "  # Добавляем поле для даты
                 "FOREIGN KEY(category_id) REFERENCES categories(id))"
             )
 
@@ -48,7 +49,8 @@ class DB:
             cur = conn.cursor()
             cur.execute(
                 "SELECT buy.id, buy.product, buy.price, buy.comment, "
-                "COALESCE(categories.name, 'Без категории') as category "
+                "COALESCE(categories.name, 'Без категории') as category, "
+                "buy.date "
                 "FROM buy LEFT JOIN categories ON buy.category_id = categories.id"
             )
             return cur.fetchall()
@@ -64,23 +66,23 @@ class DB:
         finally:
             conn.close()
 
-    def insert(self, product, price, comment, category_id):
+    def insert(self, product, price, comment, category_id, date):
         conn = self._get_connection()
         try:
             conn.execute(
-                "INSERT INTO buy VALUES (NULL,?,?,?,?)",
-                (product, price, comment, category_id)
+                "INSERT INTO buy VALUES (NULL,?,?,?,?,?)",
+                (product, price, comment, category_id, date)
             )
             conn.commit()
         finally:
             conn.close()
 
-    def update(self, id, product, price, comment, category_id):
+    def update(self, id, product, price, comment, category_id, date):
         conn = self._get_connection()
         try:
             conn.execute(
-                "UPDATE buy SET product=?, price=?, comment=?, category_id=? WHERE id=?",
-                (product, price, comment, category_id, id)
+                "UPDATE buy SET product=?, price=?, comment=?, category_id=?, date=? WHERE id=?",
+                (product, price, comment, category_id, date, id)
             )
             conn.commit()
         finally:
@@ -100,7 +102,7 @@ class DB:
             cur = conn.cursor()
             query = """
                 SELECT buy.id, buy.product, buy.price, buy.comment, 
-                       categories.name as category 
+                       categories.name as category, buy.date
                 FROM buy LEFT JOIN categories ON buy.category_id = categories.id
                 WHERE buy.product LIKE ? 
                 AND (categories.name LIKE ? OR ? = '')
@@ -145,15 +147,26 @@ def main(page: ft.Page):
     text_color = "#5E503F"
     accent_color = "#F7C548"
 
-    page.title = "Бюджет 0.2 (с категориями)"
+    page.title = "Бюджет 0.3 (с датами)"
     page.window_width = 800
     page.window_height = 600
     page.bgcolor = background_color
     page.padding = 20
 
+    page.theme = ft.Theme(
+        color_scheme=ft.ColorScheme(
+            primary=secondary_color,  # Основной акцент (#F4D35E)
+            on_primary=text_color,  # Цвет текста на акцентном фоне (#5E503F)
+            surface=background_color,  # Фон (#FFF9E6)
+            tertiary=accent_color,
+        ),
+
+    )
+
     db = DB()
     selected_tuple = None
     categories = db.get_categories()
+    selected_date = None
 
     # Поля ввода
     product_text = ft.TextField(
@@ -186,6 +199,43 @@ def main(page: ft.Page):
         min_lines=1,
         max_lines=3,
         label_style=ft.TextStyle(color=text_color))
+
+    # Поле для отображения выбранной даты
+    date_text = ft.Text(
+        "Дата не выбрана",
+        size=14,
+        color=text_color)
+
+    # Функция для обработки выбора даты
+    def handle_date_change(e):
+        nonlocal selected_date
+        selected_date = e.control.value
+        date_text.value = selected_date.strftime("%d.%m.%Y")
+        page.update()
+
+    # Функция для открытия DatePicker
+    def open_date_picker(e):
+        date_picker = ft.DatePicker(
+            first_date=datetime(2000, 1, 1),
+            last_date=datetime(2030, 12, 31),
+            on_change=handle_date_change,
+
+        )
+
+        page.open(date_picker)
+        
+
+
+    # Кнопка выбора даты
+    date_button = ft.ElevatedButton(
+        "Выбрать дату",
+        icon=ft.Icons.CALENDAR_MONTH,
+        style=ft.ButtonStyle(
+            bgcolor=primary_color,
+            color=text_color,
+            padding=ft.padding.symmetric(horizontal=12, vertical=8),
+            shape=ft.RoundedRectangleBorder(radius=8)),
+        on_click=open_date_picker)
 
     # Выпадающий список категорий
     category_dropdown = ft.Dropdown(
@@ -279,6 +329,7 @@ def main(page: ft.Page):
         )
 
         for row in rows:
+            date_str = datetime.strptime(row[5], "%Y-%m-%d").strftime("%d.%m.%Y") if row[5] else "Без даты"
             list_view.controls.append(
                 ft.Card(
                     content=ft.Container(
@@ -290,7 +341,7 @@ def main(page: ft.Page):
                                 weight=ft.FontWeight.BOLD,
                                 size=16),
                             subtitle=ft.Text(
-                                f"{row[2]} руб. • {row[3]} • {row[4]}",
+                                f"{row[2]} руб. • {date_str} • {row[3]} • {row[4]}",
                                 size=14),
                             on_click=lambda e, row=row: select_row(row)),
                         padding=10,
@@ -304,12 +355,20 @@ def main(page: ft.Page):
         page.update()
 
     def select_row(row):
-        nonlocal selected_tuple
+        nonlocal selected_tuple, selected_date
         selected_tuple = row
         product_text.value = row[1]
         price_text.value = row[2]
         comment_text.value = row[3]
         category_dropdown.value = row[4] if row[4] else ""
+
+        if row[5]:
+            selected_date = datetime.strptime(row[5], "%Y-%m-%d").date()
+            date_text.value = selected_date.strftime("%d.%m.%Y")
+        else:
+            selected_date = None
+            date_text.value = "Дата не выбрана"
+
         page.update()
 
     def view_command(e):
@@ -322,8 +381,20 @@ def main(page: ft.Page):
 
     def add_command(e):
         if product_text.value and price_text.value:
+            if not selected_date:
+                page.snack_bar = ft.SnackBar(ft.Text("Выберите дату!"))
+                page.snack_bar.open = True
+                page.update()
+                return
+
             category_id = next((cat[0] for cat in categories if cat[1] == category_dropdown.value), None)
-            db.insert(product_text.value, price_text.value, comment_text.value, category_id)
+            db.insert(
+                product_text.value,
+                price_text.value,
+                comment_text.value,
+                category_id,
+                selected_date.strftime("%Y-%m-%d")
+            )
             update_list()
             clear_fields()
         else:
@@ -349,22 +420,39 @@ def main(page: ft.Page):
             page.snack_bar.open = True
             page.update()
             return
+
+        if not selected_date:
+            page.snack_bar = ft.SnackBar(ft.Text("Выберите дату!"))
+            page.snack_bar.open = True
+            page.update()
+            return
+
         if selected_tuple:
             category_id = next((cat[0] for cat in categories if cat[1] == category_dropdown.value), None)
-            db.update(selected_tuple[0], product_text.value, price_text.value, comment_text.value, category_id)
+            db.update(
+                selected_tuple[0],
+                product_text.value,
+                price_text.value,
+                comment_text.value,
+                category_id,
+                selected_date.strftime("%Y-%m-%d")
+            )
             update_list()
 
     def clear_fields():
+        nonlocal selected_date
         product_text.value = ""
         price_text.value = ""
         comment_text.value = ""
         category_dropdown.value = None
+        selected_date = None
+        date_text.value = "Дата не выбрана"
         page.update()
 
     page.add(
         ft.Column([
             ft.Text(
-                "Учёт расходов с категориями",
+                "Каждый рубль на счету",
                 size=24,
                 color=text_color,
                 weight=ft.FontWeight.BOLD),
@@ -375,8 +463,11 @@ def main(page: ft.Page):
             ft.Row(
                 controls=[comment_text, category_dropdown],
                 spacing=20),
+            ft.Row(
+                controls=[date_button, date_text],
+                spacing=20),
             ft.Divider(height=20, color=secondary_color),
-            stats_text,  # Добавляем виджет статистики
+            stats_text,
             ft.Divider(height=20, color=secondary_color),
             ft.Row(
                 controls=[
