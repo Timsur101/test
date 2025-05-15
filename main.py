@@ -11,14 +11,12 @@ class DB:
     def _create_table(self):
         conn = self._get_connection()
         try:
-            # Создаем таблицу категорий (если не существует)
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS categories ("
                 "id INTEGER PRIMARY KEY, "
                 "name TEXT UNIQUE)"
             )
 
-            # Создаем таблицу расходов с ссылкой на категорию
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS buy ("
                 "id INTEGER PRIMARY KEY, "
@@ -29,12 +27,10 @@ class DB:
                 "FOREIGN KEY(category_id) REFERENCES categories(id))"
             )
 
-            # Добавляем основные категории, если их нет
             conn.execute(
                 "INSERT OR IGNORE INTO categories (name) VALUES "
                 "('Продукты'), ('Транспорт'), ('Жилье'), ('Развлечения'), ('Другое')"
             )
-            # Миграция: добавляем category_id к старым записям
             conn.execute(
                 "UPDATE buy SET category_id = (SELECT id FROM categories WHERE name = 'Другое') "
                 "WHERE category_id IS NULL"
@@ -52,8 +48,8 @@ class DB:
             cur = conn.cursor()
             cur.execute(
                 "SELECT buy.id, buy.product, buy.price, buy.comment, "
-                "COALESCE(categories.name, 'Без категории') as category "  # Если категории нет, подставим текст
-                "FROM buy LEFT JOIN categories ON buy.category_id = categories.id"  # LEFT JOIN гарантирует выборку всех записей
+                "COALESCE(categories.name, 'Без категории') as category "
+                "FROM buy LEFT JOIN categories ON buy.category_id = categories.id"
             )
             return cur.fetchall()
         finally:
@@ -111,6 +107,32 @@ class DB:
             """
             cur.execute(query, (f"%{product}%", f"%{category}%", category))
             return cur.fetchall()
+        finally:
+            conn.close()
+
+    def get_total_spent(self):
+        conn = self._get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT SUM(CAST(price AS REAL)) FROM buy")
+            result = cur.fetchone()[0]
+            return result if result else 0
+        finally:
+            conn.close()
+
+    def get_top_category(self):
+        conn = self._get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT categories.name, SUM(CAST(buy.price AS REAL)) as total
+                FROM buy LEFT JOIN categories ON buy.category_id = categories.id
+                GROUP BY categories.name
+                ORDER BY total DESC
+                LIMIT 1
+            """)
+            result = cur.fetchone()
+            return result if result else ("Нет данных", 0)
         finally:
             conn.close()
 
@@ -177,9 +199,15 @@ def main(page: ft.Page):
         color=text_color,
         label_style=ft.TextStyle(color=text_color),
         expand=True,
-        on_change=lambda e: search_command(e)  # Автопоиск при изменении
-
+        on_change=lambda e: search_command(e)
     )
+
+    # Виджет статистики
+    stats_text = ft.Text(
+        "Статистика: загрузка...",
+        size=14,
+        color=text_color,
+        weight=ft.FontWeight.BOLD)
 
     list_view = ft.ListView(expand=True, spacing=5)
     list_container = ft.Container(
@@ -232,6 +260,15 @@ def main(page: ft.Page):
         spacing=12,
         alignment=ft.MainAxisAlignment.CENTER)
 
+    def update_stats():
+        total = db.get_total_spent()
+        top_category, top_amount = db.get_top_category()
+        stats_text.value = (
+            f"Всего потрачено: {total:.2f} руб. | "
+            f"Больше всего потрачено на: {top_category} ({top_amount:.2f} руб.)"
+        )
+        page.update()
+
     def update_list():
         list_view.controls.clear()
         selected_category = category_dropdown.value if category_dropdown.value and category_dropdown.value != "Все категории" else ""
@@ -253,7 +290,7 @@ def main(page: ft.Page):
                                 weight=ft.FontWeight.BOLD,
                                 size=16),
                             subtitle=ft.Text(
-                                f"{row[2]} руб. • {row[4]} • {row[3]}",
+                                f"{row[2]} руб. • {row[3]} • {row[4]}",
                                 size=14),
                             on_click=lambda e, row=row: select_row(row)),
                         padding=10,
@@ -262,6 +299,8 @@ def main(page: ft.Page):
                     elevation=1,
                     color=secondary_color,
                     margin=ft.margin.symmetric(vertical=4)))
+
+        update_stats()
         page.update()
 
     def select_row(row):
@@ -313,7 +352,6 @@ def main(page: ft.Page):
         if selected_tuple:
             category_id = next((cat[0] for cat in categories if cat[1] == category_dropdown.value), None)
             db.update(selected_tuple[0], product_text.value, price_text.value, comment_text.value, category_id)
-
             update_list()
 
     def clear_fields():
@@ -338,6 +376,8 @@ def main(page: ft.Page):
                 controls=[comment_text, category_dropdown],
                 spacing=20),
             ft.Divider(height=20, color=secondary_color),
+            stats_text,  # Добавляем виджет статистики
+            ft.Divider(height=20, color=secondary_color),
             ft.Row(
                 controls=[
                     list_container,
@@ -346,6 +386,7 @@ def main(page: ft.Page):
                 expand=True,
                 vertical_alignment=ft.CrossAxisAlignment.START)],
             expand=True))
+
     category_dropdown.value = "Все категории"
     update_list()
 
