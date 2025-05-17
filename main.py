@@ -1,7 +1,22 @@
 import sqlite3
 import flet as ft
 from datetime import datetime
+from functools import wraps
 
+
+def singleton(cls):
+    instances = {}
+
+    @wraps(cls)
+    def wrapper(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    return wrapper
+
+
+@singleton
 
 class DB:
     def __init__(self):
@@ -164,6 +179,8 @@ def main(page: ft.Page):
     )
 
     db = DB()
+
+
     selected_tuple = None
     categories = db.get_categories()
     selected_date = None
@@ -223,7 +240,7 @@ def main(page: ft.Page):
         )
 
         page.open(date_picker)
-        
+
 
 
     # Кнопка выбора даты
