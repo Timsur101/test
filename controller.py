@@ -1,11 +1,42 @@
 from datetime import datetime
 
-
 class BudgetController:
-    def __init__(self, model, view):
+    def __init__(self, model, view, registration_view=None):
         self.model = model
         self.view = view
+        self.registration_view = registration_view
         self.view.controller = self
+        if self.registration_view:
+            self.registration_view.controller = self
+        self.current_page = None
+
+    def register_command(self, e):
+        """Обрабатывает команду регистрации."""
+        login = self.registration_view.login_text.value
+        email = self.registration_view.email_text.value
+        password = self.registration_view.password_text.value
+
+        if not login or not email or not password:
+            self.registration_view.show_snackbar("Заполните все поля!")
+            return
+
+        if self.model.check_user_exists(login, email):
+            self.registration_view.show_snackbar("Логин или email уже заняты!")
+            return
+
+        if self.model.register_user(login, email, password):
+            self.registration_view.show_snackbar("Регистрация успешна!")
+            self.registration_view.clear_fields()
+            self.switch_to_budget(None)  # Переход к основному интерфейсу
+        else:
+            self.registration_view.show_snackbar("Ошибка регистрации. Попробуйте снова.")
+
+    def switch_to_budget(self, e):
+        """Переключает на интерфейс бюджета."""
+        if self.current_page:
+            self.current_page.controls.clear()
+            self.view.setup_ui(self.current_page)
+            self.current_page.update()
 
     def get_categories(self):
         return self.model.get_categories()

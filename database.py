@@ -18,14 +18,40 @@ class DB:
                 print("Подключено к базе данных MySQL")
         except Error as e:
             print(f"Ошибка подключения к MySQL: {e}")
-            self.connection = None  # Убедитесь, что connection явно None при ошибке
+            self.connection = None
 
     def get_cursor(self):
         if not self.connection or not self.connection.is_connected():
-            self.connect()  # Попробовать переподключиться
+            self.connect()
             if not self.connection or not self.connection.is_connected():
                 raise Exception("Не удалось установить подключение к базе данных")
         return self.connection.cursor()
+
+    def check_user_exists(self, login, email):
+        """Проверяет, существует ли пользователь с указанным логином или email."""
+        try:
+            cursor = self.get_cursor()
+            query = "SELECT id FROM users WHERE login = %s OR email = %s"
+            cursor.execute(query, (login, email))
+            result = cursor.fetchone()
+            cursor.close()
+            return result is not None
+        except Error as e:
+            print(f"Ошибка проверки пользователя: {e}")
+            return False
+
+    def register_user(self, login, email, password):
+        """Регистрирует нового пользователя."""
+        try:
+            cursor = self.get_cursor()
+            query = "INSERT INTO users (login, email, password) VALUES (%s, %s, %s)"
+            cursor.execute(query, (login, email, password))
+            self.connection.commit()
+            cursor.close()
+            return True
+        except Error as e:
+            print(f"Ошибка регистрации пользователя: {e}")
+            return False
 
     def get_categories(self):
         try:

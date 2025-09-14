@@ -18,7 +18,7 @@ class BudgetView:
 
     def setup_ui(self, page: ft.Page):
         self.page = page
-        page.title = "Бюджет 0.3 (с датами)"
+        page.title = "Калькулятор, но не калькулятор клянусь"
         page.window_width = 800
         page.window_height = 600
         page.bgcolor = self.background_color
